@@ -1,0 +1,499 @@
+// devnevoX Technology — client portal data model
+// Everything the UI renders lives here. No hardcoded content in the frontend.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────── Auth & people
+
+enum Role {
+  CLIENT
+  ADMIN
+  TEAM_MEMBER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null when using OAuth only
+  role          Role      @default(CLIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Client-specific profile (only meaningful for CLIENT role, but optional for all)
+  client        Client?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  // relations authored / assigned
+  authoredComments Comment[]       @relation("CommentAuthor")
+  sentMessages     Message[]       @relation("MessageSender")
+  assignedTasks    Task[]          @relation("TaskAssignee")
+  notifications    Notification[]
+  activities       ActivityLog[]   @relation("ActivityActor")
+  mentions         Mention[]       @relation("MentionedUser")
+  uploadedFiles    FileAsset[]     @relation("FileUploader")
+}
+
+// NextAuth adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────── Regions & currency
+
+model Region {
+  id           String   @id @default(cuid())
+  code         String   @unique // e.g. "IN", "US", "EU"
+  name         String // "India", "United States"
+  currency     String // ISO 4217 e.g. "INR", "USD" — drives pricing
+  currencySign String // "₹", "$"
+  taxLabel     String? // "GST 18%", "Sales Tax"
+  taxRatePct   Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  clients     Client[]
+  planPrices  PlanPrice[]
+}
+
+// ─────────────────────────────────────────── Clients
+
+model Client {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     String
+  phone       String?
+  website     String?
+  regionId    String
+  region      Region   @relation(fields: [regionId], references: [id])
+  avatarColor String   @default("#22c55e")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects      Project[]
+  invoices      Invoice[]
+  payments      Payment[]
+  subscriptions Subscription[]
+  stripeCustomerId String?
+}
+
+// ─────────────────────────────────────────── Services (admin-editable)
+
+model Service {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @db.Text
+  icon        String   @default("Sparkles") // lucide icon name
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects Project[]
+}
+
+// ─────────────────────────────────────────── Projects / Orders
+
+enum ProjectStatus {
+  NEW
+  DISCOVERY
+  IN_PROGRESS
+  REVIEW
+  DELIVERED
+  MAINTENANCE
+  CANCELLED
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  code        String        @unique // human ref e.g. "DVX-1042"
+  title       String
+  description String        @db.Text
+  status      ProjectStatus @default(NEW)
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     Service?      @relation(fields: [serviceId], references: [id])
+  budgetMin   Int? // stored in minor units of client's currency
+  budgetMax   Int?
+  currency    String        @default("USD")
+  startedAt   DateTime?
+  dueAt       DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tasks      Task[]
+  invoices   Invoice[]
+  messages   Message[]
+  files      FileAsset[]
+  activities ActivityLog[]
+}
+
+// ─────────────────────────────────────────── Tasks
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?    @db.Text
+  status      TaskStatus @default(TODO)
+  order       Int        @default(0)
+  weight      Int        @default(1) // progress weighting
+  assigneeId  String?
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+// ─────────────────────────────────────────── Plans & multi-currency prices
+
+model Plan {
+  id          String   @id @default(cuid())
+  slug        String   @unique // "basic" | "standard" | "premium"
+  name        String
+  tagline     String
+  description String   @db.Text
+  order       Int      @default(0)
+  active      Boolean  @default(true)
+  highlight   Boolean  @default(false) // "Most popular"
+  stripeProductId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  features      PlanFeature[]
+  prices        PlanPrice[]
+  subscriptions Subscription[]
+}
+
+model PlanFeature {
+  id     String  @id @default(cuid())
+  planId String
+  plan   Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  label  String
+  included Boolean @default(true)
+  order  Int     @default(0)
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+model PlanPrice {
+  id             String          @id @default(cuid())
+  planId         String
+  plan           Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  regionId       String
+  region         Region          @relation(fields: [regionId], references: [id])
+  currency       String // "INR" | "USD"
+  interval       BillingInterval @default(MONTH)
+  amount         Int // minor units (paise / cents)
+  stripePriceId  String? // synced from Stripe; editable by admins
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  subscriptions  Subscription[]
+
+  @@unique([planId, regionId, interval])
+}
+
+// ─────────────────────────────────────────── Subscriptions (Stripe Billing)
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  UNPAID
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  clientId             String
+  client               Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  planPriceId          String
+  planPrice            PlanPrice          @relation(fields: [planPriceId], references: [id])
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeSubscriptionId String?            @unique
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+// ─────────────────────────────────────────── Payments & invoices
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  number        String        @unique // "INV-2026-0007"
+  clientId      String
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projectId     String?
+  project       Project?      @relation(fields: [projectId], references: [id])
+  status        InvoiceStatus @default(OPEN)
+  currency      String
+  subtotal      Int
+  taxAmount     Int           @default(0)
+  total         Int
+  dueAt         DateTime?
+  issuedAt      DateTime      @default(now())
+  stripeInvoiceId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int     @default(1)
+  unitAmount  Int
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id                     String        @id @default(cuid())
+  clientId               String
+  client                 Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoiceId              String?
+  invoice                Invoice?      @relation(fields: [invoiceId], references: [id])
+  amount                 Int
+  currency               String
+  status                 PaymentStatus @default(PENDING)
+  method                 String        @default("card")
+  stripePaymentIntentId  String?
+  stripeCheckoutSessionId String?
+  receiptUrl             String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+}
+
+// ─────────────────────────────────────────── Messaging & collaboration
+
+model Message {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  comments    Comment[]
+  attachments FileAsset[]
+  mentions    Mention[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("CommentAuthor", fields: [authorId], references: [id])
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  mentions Mention[]
+}
+
+model Mention {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("MentionedUser", fields: [userId], references: [id], onDelete: Cascade)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────── Files (S3 / Cloudinary)
+
+model FileAsset {
+  id         String   @id @default(cuid())
+  name       String
+  url        String
+  mimeType   String
+  size       Int
+  provider   String   @default("s3") // "s3" | "cloudinary" | "local"
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messageId  String?
+  message    Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  uploadedById String?
+  uploadedBy   User?  @relation("FileUploader", fields: [uploadedById], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────── Notifications
+
+enum NotificationType {
+  PROJECT_UPDATE
+  TASK_ASSIGNED
+  MENTION
+  PAYMENT
+  SUBSCRIPTION
+  MESSAGE
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+// ─────────────────────────────────────────── Activity timeline
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation("ActivityActor", fields: [actorId], references: [id])
+  verb      String // "created", "moved", "commented", "paid"
+  summary   String
+  meta      Json?
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────── CMS: editable content blocks
+
+enum ContentType {
+  RICH_TEXT
+  FAQ
+  TERMS
+  MARKETING
+}
+
+model ContentBlock {
+  id        String      @id @default(cuid())
+  key       String      @unique // "terms", "hero.title", "faq"...
+  type      ContentType @default(RICH_TEXT)
+  title     String
+  body      String      @db.Text
+  order     Int         @default(0)
+  published Boolean     @default(true)
+  updatedAt DateTime    @updatedAt
+  createdAt DateTime    @default(now())
+}
+
+// ─────────────────────────────────────────── Dynamic form config (New Order)
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  SELECT
+  BUDGET_RANGE
+  DATE
+}
+
+model FormField {
+  id          String    @id @default(cuid())
+  formKey     String    @default("new_order")
+  key         String // "service", "budget", "deadline"...
+  label       String
+  type        FieldType @default(TEXT)
+  placeholder String?
+  required    Boolean   @default(false)
+  order       Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  options FormFieldOption[]
+
+  @@unique([formKey, key])
+}
+
+model FormFieldOption {
+  id      String    @id @default(cuid())
+  fieldId String
+  field   FormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  label   String
+  value   String
+  // for BUDGET_RANGE options
+  min     Int?
+  max     Int?
+  order   Int       @default(0)
+}

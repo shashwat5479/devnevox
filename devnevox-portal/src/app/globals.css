@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme (kept subtle; portal defaults to dark like the brand video) */
+    --background: 150 20% 99%;
+    --foreground: 160 12% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 160 12% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 12% 10%;
+    --primary: 152 76% 32%;
+    --primary-foreground: 150 40% 98%;
+    --secondary: 150 12% 95%;
+    --secondary-foreground: 160 12% 12%;
+    --muted: 150 10% 95%;
+    --muted-foreground: 155 8% 42%;
+    --accent: 150 30% 94%;
+    --accent-foreground: 152 76% 22%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 12% 90%;
+    --input: 150 12% 88%;
+    --ring: 152 76% 40%;
+    --brand: 145 90% 45%;
+    --brand-soft: 145 60% 92%;
+    --brand-foreground: 160 40% 8%;
+    --brand-glow: 140 95% 55%;
+    --radius: 0.9rem;
+  }
+
+  .dark {
+    /* Signature devnevoX look: near-black + matrix green */
+    --background: 150 18% 4%;
+    --foreground: 150 12% 96%;
+    --card: 155 16% 7%;
+    --card-foreground: 150 12% 96%;
+    --popover: 155 20% 6%;
+    --popover-foreground: 150 12% 96%;
+    --primary: 145 90% 50%;
+    --primary-foreground: 155 40% 6%;
+    --secondary: 150 10% 12%;
+    --secondary-foreground: 150 12% 92%;
+    --muted: 150 10% 11%;
+    --muted-foreground: 150 8% 60%;
+    --accent: 150 20% 14%;
+    --accent-foreground: 145 80% 70%;
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 12% 16%;
+    --input: 150 12% 18%;
+    --ring: 145 90% 50%;
+    --brand: 142 92% 52%;
+    --brand-soft: 150 30% 16%;
+    --brand-foreground: 155 40% 6%;
+    --brand-glow: 138 96% 60%;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  html { scroll-behavior: smooth; }
+}
+
+@layer components {
+  /* bracketed mono eyebrow labels like [ CYBER SECURITY ] from the brand video */
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.28em] text-brand/80;
+  }
+  .eyebrow::before { content: "[ "; @apply text-brand/50; }
+  .eyebrow::after { content: " ]"; @apply text-brand/50; }
+
+  .glass {
+    @apply bg-card/70 backdrop-blur-xl border border-border/70;
+  }
+  .brand-gradient-text {
+    @apply bg-gradient-to-br from-brand via-brand to-emerald-300 bg-clip-text text-transparent;
+  }
+  .stat-number {
+    @apply text-3xl font-semibold tracking-tight tabular-nums;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-muted;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent;
+    content: "";
+  }
+}
+
+@layer utilities {
+  .grid-bg {
+    background-image:
+      radial-gradient(600px 300px at 20% -10%, hsl(var(--brand) / 0.10), transparent 60%),
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 100% 100%, 44px 44px, 44px 44px;
+  }
+  .aurora {
+    background:
+      radial-gradient(40% 60% at 50% 100%, hsl(var(--brand) / 0.55), transparent 70%),
+      radial-gradient(30% 50% at 60% 90%, hsl(var(--brand-glow) / 0.35), transparent 70%);
+    filter: blur(6px);
+  }
+  .text-glow { text-shadow: 0 0 24px hsl(var(--brand) / 0.55); }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}

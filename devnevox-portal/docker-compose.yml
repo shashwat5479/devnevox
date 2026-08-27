@@ -1,0 +1,16 @@
+# One-command PostgreSQL for local dev:  docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: devnevox-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: devnevox
+    ports:
+      - "5432:5432"
+    volumes:
+      - devnevox_pg:/var/lib/postgresql/data
+volumes:
+  devnevox_pg:
