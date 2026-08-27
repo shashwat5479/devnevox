@@ -1,8 +1,6 @@
 "use client";
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -13,6 +11,14 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState("");
