@@ -106,7 +106,7 @@ export default async function Landing() {
       <section id="pricing" className="container border-t border-border py-24">
         <p className="eyebrow">Maintenance plans</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Simple, transparent care.</h2>
-        <p className="mt-2 text-muted-foreground">Prices shown in USD. Clients are billed automatically in their region's currency.</p>
+        <p className="mt-2 text-muted-foreground">Prices shown in USD. Clients are billed automatically in their region&rsquo;s currency.</p>
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {plans.map((plan) => {
             const price = priceFor(plan);
