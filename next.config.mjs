@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: {
-    // Lint locally with `npm run lint`; don't fail production builds on lint-only issues.
     ignoreDuringBuilds: true,
   },
   images: {
