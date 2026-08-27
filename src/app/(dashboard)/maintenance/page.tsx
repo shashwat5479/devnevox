@@ -112,7 +112,7 @@ export default async function MaintenancePage({ searchParams }: { searchParams: 
       </div>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Live billing changes run through Stripe. When Stripe keys aren't configured, plan switches are applied directly for demo purposes.
+        Live billing changes run through Stripe. When Stripe keys aren&rsquo;t configured, plan switches are applied directly for demo purposes.
       </p>
     </>
   );
